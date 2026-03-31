@@ -191,7 +191,7 @@ const CHAT_LINES: Record<AgentChatId, ChatLines> = {
       "Has anyone updated the project board?",
       "Deadline is tomorrow. Just saying.",
       "Status report sent. Nobody read it. As usual.",
-      "Blocker flagged. Waiting on Tolga.",
+      "Blocker flagged. Waiting on approval.",
     ],
   },
   ledger: {

@@ -3,6 +3,20 @@
 :root {
   --background: #0a0a0f;
   --foreground: #e0e0e0;
+  --cork: #8b6914;
+  --cork-dark: #6b4f10;
+  --sticky-yellow: #fbbf24;
+  --sticky-green: #22c55e;
+  --sticky-red: #ef4444;
+  --cal-today: #9333ea;
+  --cal-event-a: #3b82f6;
+  --cal-event-b: #f59e0b;
+  --cal-event-c: #ef4444;
+  --ticker-bg: #07070d;
+  --ticker-text: #4b4b6b;
+  --gold: #fbbf24;
+  --silver: #94a3b8;
+  --bronze: #b45309;
 }
 
 body {
@@ -65,4 +79,10 @@ body {
 }
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+@keyframes flutter {
+  0% { transform: rotate(-0.8deg); }
+  50% { transform: rotate(0.8deg); }
+  100% { transform: rotate(-0.8deg); }
 }

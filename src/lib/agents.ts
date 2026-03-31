@@ -24,7 +24,7 @@ export const AGENTS: AgentConfig[] = [
 ];
 
 export type AgentStatus = 'active' | 'idle' | 'offline';
-export type RoomId = 'main_office' | 'meeting_room' | 'kitchen' | 'game_room' | 'server_room' | 'rest_room';
+export type RoomId = 'main_office' | 'meeting_room' | 'kitchen' | 'game_room' | 'server_room' | 'rest_room' | 'mission_board';
 
 export interface AgentState {
   id: string;

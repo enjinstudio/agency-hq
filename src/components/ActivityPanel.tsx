@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AgentState, ActivityItem, SystemStats, RoomId, ActivityType } from '@/lib/agents';
+import KanbanBoard from './KanbanBoard';
+import StatsPanel from './StatsPanel';
 
 interface ActivityPanelProps {
   agents: AgentState[];
@@ -16,6 +18,7 @@ const ROOM_LABELS: Record<RoomId, { emoji: string; name: string }> = {
   game_room: { emoji: '🎮', name: 'Game' },
   server_room: { emoji: '🖥️', name: 'Server' },
   rest_room: { emoji: '😴', name: 'Rest' },
+  mission_board: { emoji: '📌', name: 'Missions' },
 };
 
 const TYPE_CONFIG: Record<ActivityType, { borderColor: string; icon: string; dimmed?: boolean }> = {
@@ -43,7 +46,7 @@ function relativeTime(iso: string): string {
 
 function groupByRoom(agents: AgentState[]): Record<RoomId, number> {
   const counts: Record<RoomId, number> = {
-    main_office: 0, meeting_room: 0, kitchen: 0, game_room: 0, server_room: 0, rest_room: 0,
+    main_office: 0, meeting_room: 0, kitchen: 0, game_room: 0, server_room: 0, rest_room: 0, mission_board: 0,
   };
   for (const a of agents) {
     if (counts[a.room] !== undefined) counts[a.room]++;
@@ -259,13 +262,13 @@ function TimelineBar({ activities }: { activities: ActivityItem[] }) {
   );
 }
 
-type TabId = 'now' | 'feed' | 'stats';
+type TabId = 'activity' | 'board' | 'stats';
 
 export default function ActivityPanel({ agents, activities, stats }: ActivityPanelProps) {
   const feedRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>('now');
+  const [activeTab, setActiveTab] = useState<TabId>('activity');
   const prevCountRef = useRef(0);
   const activeCount = agents.filter(a => a.status === 'active').length;
   const idleCount = agents.filter(a => a.status === 'idle').length;
@@ -370,21 +373,26 @@ export default function ActivityPanel({ agents, activities, stats }: ActivityPan
         );
       })()}
 
-      {/* Tab Bar — touch-friendly on mobile (44px tap targets) */}
-      <div className="px-3 py-1 border-b border-[#1e1e30] flex items-center gap-1 md:gap-3">
+      {/* Tab Bar — Activity | Board | Stats */}
+      <div className="px-3 py-1 border-b border-[#1e1e30] flex items-center gap-4">
         {([
-          { id: 'now' as TabId, label: '🔥 Now' },
-          { id: 'feed' as TabId, label: '💬 Feed' },
-          { id: 'stats' as TabId, label: '📊 Stats' },
+          { id: 'activity' as TabId, label: 'ACTIVITY' },
+          { id: 'board' as TabId, label: 'BOARD' },
+          { id: 'stats' as TabId, label: 'STATS' },
         ]).map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`text-xs md:text-[10px] font-bold py-2 md:py-0.5 px-3 md:px-0 min-h-[44px] md:min-h-0 transition-colors ${
-              activeTab === tab.id
-                ? 'text-white border-b-2 md:border-b border-white'
-                : 'text-[#6b7280] hover:text-[#9ca3af]'
-            }`}
+            className="transition-colors min-h-[36px] md:min-h-0"
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: activeTab === tab.id ? '#ffffff' : '#4b4b6b',
+              borderBottom: activeTab === tab.id ? '2px solid #9333ea' : '2px solid transparent',
+              paddingBottom: 2,
+            }}
           >
             {tab.label}
           </button>
@@ -392,18 +400,28 @@ export default function ActivityPanel({ agents, activities, stats }: ActivityPan
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto" ref={activeTab === 'feed' ? feedRef : undefined}>
-        {activeTab === 'now' && <NowTab agents={agents} />}
-        {activeTab === 'feed' && (
-          <div className="py-1">
-            {sortedActivities.length === 0 ? (
-              <p className="text-[10px] text-[#4b5563] text-center py-6">Waiting for activity...</p>
-            ) : (
-              sortedActivities.map((item, i) => <CompactMessage key={i} item={item} />)
-            )}
-          </div>
+      <div className="flex-1 overflow-y-auto" ref={activeTab === 'activity' ? feedRef : undefined}>
+        {activeTab === 'activity' && (
+          <>
+            <NowTab agents={agents} />
+            <div className="border-t border-[#1e1e30] py-1">
+              {sortedActivities.length === 0 ? (
+                <p className="text-[10px] text-[#4b5563] text-center py-6">Waiting for activity...</p>
+              ) : (
+                sortedActivities.map((item, i) => <CompactMessage key={i} item={item} />)
+              )}
+            </div>
+          </>
         )}
-        {activeTab === 'stats' && <StatsTab agents={agents} activities={activities} stats={stats} />}
+        {activeTab === 'board' && <KanbanBoard />}
+        {activeTab === 'stats' && (
+          <>
+            <StatsPanel />
+            <div className="border-t border-[#1e1e30]">
+              <StatsTab agents={agents} activities={activities} stats={stats} />
+            </div>
+          </>
+        )}
       </div>
 
       {/* Timeline Bar */}

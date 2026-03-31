@@ -41,7 +41,8 @@ const ROOMS: RoomDef[] = [
   { id: 'main_office', label: 'MAIN OFFICE', emoji: '🏢', x: 0, y: 260, w: 960, h: 260, floorColor1: '#1e1e35', floorColor2: '#18182c', tileSize: 32 },
   { id: 'kitchen', label: 'KITCHEN', emoji: '🍳', x: 0, y: 520, w: 240, h: 200, floorColor1: '#2a2418', floorColor2: '#221e14', tileSize: 26 },
   { id: 'game_room', label: 'GAME ROOM', emoji: '🎮', x: 240, y: 520, w: 340, h: 200, floorColor1: '#1a1e2e', floorColor2: '#151828', tileSize: 30 },
-  { id: 'rest_room', label: 'REST ROOM', emoji: '😴', x: 580, y: 520, w: 380, h: 200, floorColor1: '#141420', floorColor2: '#10101a', tileSize: 28 },
+  { id: 'rest_room', label: 'REST ROOM', emoji: '😴', x: 580, y: 520, w: 200, h: 200, floorColor1: '#141420', floorColor2: '#10101a', tileSize: 28 },
+  { id: 'mission_board', label: 'MISSION BOARD', emoji: '📌', x: 780, y: 520, w: 180, h: 200, floorColor1: '#161622', floorColor2: '#12121c', tileSize: 26 },
 ];
 
 function getRoomDef(id: RoomId): RoomDef {
@@ -76,10 +77,14 @@ const GAME_ROOM_SPOTS = [
 
 // Rest room bed/couch spots — each sleeping agent gets unique position
 const REST_ROOM_SPOTS = [
-  { x: 630, y: 580 }, { x: 720, y: 575 }, { x: 810, y: 580 },
-  { x: 900, y: 575 }, { x: 660, y: 640 }, { x: 750, y: 645 },
-  { x: 840, y: 640 }, { x: 930, y: 645 }, { x: 690, y: 690 },
-  { x: 780, y: 695 }, { x: 870, y: 690 },
+  { x: 620, y: 580 }, { x: 680, y: 575 }, { x: 740, y: 580 },
+  { x: 620, y: 640 }, { x: 680, y: 645 }, { x: 740, y: 640 },
+  { x: 650, y: 690 }, { x: 710, y: 695 },
+];
+
+const MISSION_BOARD_SPOTS = [
+  { x: 820, y: 600 }, { x: 880, y: 590 }, { x: 920, y: 600 },
+  { x: 840, y: 660 }, { x: 900, y: 650 },
 ];
 
 const SERVER_ROOM_SPOTS = [
@@ -102,6 +107,7 @@ const DOORWAYS = [
   { x: 100, y: 510, w: 60, h: 20 },
   { x: 380, y: 510, w: 60, h: 20 },
   { x: 700, y: 510, w: 60, h: 20 },
+  { x: 810, y: 510, w: 60, h: 20 },
 ];
 
 // ===== AGENT ANIMATION STATE =====
@@ -333,6 +339,12 @@ export default function PixelOffice({ agents, activities = [], onAgentClick }: P
       const spot = REST_ROOM_SPOTS[idx % REST_ROOM_SPOTS.length];
       return { x: spot.x, y: spot.y, state: 'sleeping' };
     }
+    if (room === 'mission_board') {
+      const mbAgents = allAgents.filter(a => a.room === 'mission_board');
+      const idx = mbAgents.findIndex(a => a.id === agent.id);
+      const spot = MISSION_BOARD_SPOTS[idx % MISSION_BOARD_SPOTS.length];
+      return { x: spot.x, y: spot.y, state: 'standing' };
+    }
     return { x: 480, y: 380, state: 'standing' };
   }, []);
 
@@ -397,6 +409,34 @@ export default function PixelOffice({ agents, activities = [], onAgentClick }: P
           ),
         });
         return;
+      }
+    }
+
+    // Check sticky notes on mission board
+    {
+      const bx = 780, cbX = bx + 10, cbY = 520 + 16;
+      const noteW = 26, noteH = 26, gapX = 4, gapY = 3;
+      const startX = cbX + 10, startY = cbY;
+      for (let i = 0; i < STICKY_NOTES.length; i++) {
+        const col = i % 3;
+        const row = Math.floor(i / 3);
+        const nx = startX + col * (noteW + gapX);
+        const ny = startY + row * (noteH + gapY);
+        if (mx >= nx && mx <= nx + noteW && my >= ny && my <= ny + noteH) {
+          const note = STICKY_NOTES[i];
+          const statusColor = STICKY_COLORS[note.status] || '#fbbf24';
+          setTooltip({
+            x: e.clientX, y: e.clientY,
+            content: (
+              <div style={{ width: 160, backgroundColor: '#13131f', border: '1px solid #9333ea', borderRadius: 4, padding: 8 }}>
+                <div className="text-[10px] text-white font-bold">{note.text.replace('\n', ' ')}</div>
+                <div className="text-[9px] mt-1" style={{ color: statusColor }}>{note.status.toUpperCase()}</div>
+                <div className="text-[9px] text-gray-400 mt-0.5">{note.detail}</div>
+              </div>
+            ),
+          });
+          return;
+        }
       }
     }
 
@@ -475,6 +515,9 @@ export default function PixelOffice({ agents, activities = [], onAgentClick }: P
     drawKitchen(ctx, frame);
     drawGameRoom(ctx, frame);
     drawRestRoom(ctx, frame);
+    drawMissionBoardRoom(ctx, frame);
+    drawMeetingWhiteboard(ctx, frame);
+    drawGameLeaderboard(ctx, frame);
     drawWallDecorations(ctx, frame);
     drawDayNightOverlay(ctx);
     drawClock(ctx);
@@ -887,7 +930,8 @@ function drawBaseboards(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(0, 516, 960, 4);
   ctx.fillRect(0, H - 4, 240, 4);
   ctx.fillRect(240, H - 4, 340, 4);
-  ctx.fillRect(580, H - 4, 380, 4);
+  ctx.fillRect(580, H - 4, 200, 4);
+  ctx.fillRect(780, H - 4, 180, 4);
 }
 
 function drawWalls(ctx: CanvasRenderingContext2D) {
@@ -904,6 +948,7 @@ function drawWalls(ctx: CanvasRenderingContext2D) {
   ctx.moveTo(480, 0); ctx.lineTo(480, 260);
   ctx.moveTo(240, 520); ctx.lineTo(240, H);
   ctx.moveTo(580, 520); ctx.lineTo(580, H);
+  ctx.moveTo(780, 520); ctx.lineTo(780, H);
   ctx.stroke();
 
   // Glass wall for meeting room
@@ -1579,31 +1624,29 @@ function drawRestRoom(ctx: CanvasRenderingContext2D, frame: number) {
 
   // Dim ambient overlay for rest room
   ctx.fillStyle = 'rgba(0,0,15,0.3)';
-  ctx.fillRect(rx, ry, 380, 200);
+  ctx.fillRect(rx, ry, 200, 200);
 
   // Warm dim light from center
-  const grad = ctx.createRadialGradient(rx + 190, ry + 100, 10, rx + 190, ry + 100, 180);
+  const grad = ctx.createRadialGradient(rx + 100, ry + 100, 10, rx + 100, ry + 100, 120);
   grad.addColorStop(0, 'rgba(100,80,140,0.08)');
   grad.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = grad;
-  ctx.fillRect(rx, ry, 380, 200);
+  ctx.fillRect(rx, ry, 200, 200);
 
   // Moon/stars decal on back wall
-  // Moon
   ctx.fillStyle = '#ffffcc33';
   ctx.beginPath();
-  ctx.arc(rx + 320, ry + 30, 14, 0, Math.PI * 2);
+  ctx.arc(rx + 160, ry + 30, 12, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#ffffcc22';
   ctx.beginPath();
-  ctx.arc(rx + 320, ry + 30, 10, 0, Math.PI * 2);
+  ctx.arc(rx + 160, ry + 30, 8, 0, Math.PI * 2);
   ctx.fill();
 
   // Stars on wall
   const starData = [
-    [40, 20], [80, 15], [120, 25], [160, 12], [200, 22],
-    [250, 18], [100, 35], [180, 38], [60, 40], [280, 28],
-    [140, 10], [220, 32], [300, 20], [340, 35],
+    [20, 20], [50, 15], [80, 25], [110, 12], [140, 22],
+    [30, 35], [70, 38], [100, 40], [150, 28], [60, 10],
   ];
   for (const [sx, sy] of starData) {
     const twinkle = Math.sin(frame * 0.04 + sx * 0.2 + sy * 0.3);
@@ -1612,19 +1655,15 @@ function drawRestRoom(ctx: CanvasRenderingContext2D, frame: number) {
     ctx.fillRect(rx + sx, ry + sy, 1, 1);
   }
 
-  // Beds/couches — horizontal dark shapes
+  // Beds/couches — horizontal dark shapes (smaller room)
   const beds = [
-    { x: rx + 20, y: ry + 55, w: 55, h: 20, color: '#2a2040' },
-    { x: rx + 100, y: ry + 50, w: 55, h: 20, color: '#203040' },
-    { x: rx + 180, y: ry + 55, w: 55, h: 20, color: '#2a2a35' },
-    { x: rx + 260, y: ry + 50, w: 55, h: 20, color: '#352a30' },
-    { x: rx + 40, y: ry + 110, w: 55, h: 20, color: '#253040' },
-    { x: rx + 130, y: ry + 115, w: 55, h: 20, color: '#302a40' },
-    { x: rx + 220, y: ry + 110, w: 55, h: 20, color: '#2a3035' },
-    { x: rx + 310, y: ry + 115, w: 55, h: 20, color: '#352530' },
-    { x: rx + 60, y: ry + 160, w: 55, h: 20, color: '#253535' },
-    { x: rx + 160, y: ry + 165, w: 55, h: 20, color: '#302540' },
-    { x: rx + 270, y: ry + 160, w: 55, h: 20, color: '#2a3530' },
+    { x: rx + 15, y: ry + 55, w: 50, h: 18, color: '#2a2040' },
+    { x: rx + 80, y: ry + 50, w: 50, h: 18, color: '#203040' },
+    { x: rx + 140, y: ry + 55, w: 50, h: 18, color: '#2a2a35' },
+    { x: rx + 30, y: ry + 105, w: 50, h: 18, color: '#253040' },
+    { x: rx + 100, y: ry + 110, w: 50, h: 18, color: '#302a40' },
+    { x: rx + 40, y: ry + 155, w: 50, h: 18, color: '#253535' },
+    { x: rx + 120, y: ry + 160, w: 50, h: 18, color: '#302540' },
   ];
   for (const bed of beds) {
     ctx.fillStyle = bed.color;
@@ -1638,17 +1677,17 @@ function drawRestRoom(ctx: CanvasRenderingContext2D, frame: number) {
   }
 
   // Night light (soft purple glow)
-  const nlGrad = ctx.createRadialGradient(rx + 350, ry + 170, 2, rx + 350, ry + 170, 30);
+  const nlGrad = ctx.createRadialGradient(rx + 175, ry + 170, 2, rx + 175, ry + 170, 30);
   nlGrad.addColorStop(0, 'rgba(147,51,234,0.15)');
   nlGrad.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = nlGrad;
-  ctx.fillRect(rx + 320, ry + 140, 60, 60);
+  ctx.fillRect(rx + 150, ry + 140, 50, 60);
   // Night light device
   ctx.fillStyle = '#2a1a3e';
-  ctx.fillRect(rx + 348, ry + 168, 6, 8);
+  ctx.fillRect(rx + 173, ry + 168, 6, 8);
   const nlPulse = (Math.sin(frame * 0.03) + 1) / 2;
   ctx.fillStyle = `rgba(147,51,234,${0.3 + nlPulse * 0.4})`;
-  ctx.fillRect(rx + 349, ry + 169, 4, 4);
+  ctx.fillRect(rx + 174, ry + 169, 4, 4);
 }
 
 function drawPixelBeanbag(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
@@ -2375,4 +2414,277 @@ function drawAgentName(ctx: CanvasRenderingContext2D, x: number, y: number, name
   ctx.font = 'bold 8px monospace';
   ctx.textAlign = 'center';
   ctx.fillText(name, x, y);
+}
+
+// ===== STICKY NOTES DATA =====
+const STICKY_NOTES = [
+  { id: 1, text: "Build login\npage", status: "done", detail: "Auth flow complete. Merged to main." },
+  { id: 2, text: "Fix API\nbug", status: "blocked", detail: "Rate limit issue on /v2/search. Needs review." },
+  { id: 3, text: "Deploy v2", status: "active", detail: "Staging passed. Awaiting prod window." },
+  { id: 4, text: "Write\ndocs", status: "active", detail: "API reference 60% complete." },
+  { id: 5, text: "Design\nonboarding", status: "done", detail: "Screens delivered. Dev handoff done." },
+  { id: 6, text: "Add dark\nmode", status: "active", detail: "Token system ready. Implementing." },
+  { id: 7, text: "Code\nreview", status: "done", detail: "PR #42 approved and merged." },
+  { id: 8, text: "Update\ndeps", status: "blocked", detail: "Conflict in webpack config. Investigating." },
+  { id: 9, text: "SEO\naudit", status: "active", detail: "Lighthouse score: 72. Targeting 90+." },
+  { id: 10, text: "Set up\nCI pipeline", status: "done", detail: "GitHub Actions running green." },
+  { id: 11, text: "Sketch\nmobile nav", status: "active", detail: "3 concepts in progress." },
+  { id: 12, text: "Load test", status: "blocked", detail: "Env config missing. Blocked on DevOps." },
+];
+
+const STICKY_COLORS: Record<string, string> = {
+  active: '#fbbf24',
+  done: '#22c55e',
+  blocked: '#ef4444',
+};
+
+// ===== MISSION BOARD ROOM =====
+function drawMissionBoardRoom(ctx: CanvasRenderingContext2D, frame: number) {
+  const bx = 780, by = 520;
+
+  // Corkboard wall
+  const cbX = bx + 10, cbY = by + 15, cbW = 160, cbH = 130;
+
+  // Cork base
+  ctx.fillStyle = '#8b6914';
+  ctx.fillRect(cbX, cbY, cbW, cbH);
+
+  // Pixel noise texture
+  for (let px = cbX; px < cbX + cbW; px += 4) {
+    for (let py = cbY; py < cbY + cbH; py += 4) {
+      if ((px + py) % 8 === 0) {
+        ctx.fillStyle = '#6b4f10';
+        ctx.fillRect(px, py, 2, 2);
+      }
+    }
+  }
+
+  // Border
+  ctx.strokeStyle = '#4a3008';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(cbX, cbY, cbW, cbH);
+
+  // Label
+  ctx.fillStyle = '#4a3008';
+  ctx.font = 'bold 7px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('MISSION BOARD', cbX + 4, cbY + 10);
+
+  // Sticky notes (3 per row, 4 rows) — scaled to fit
+  const noteW = 26, noteH = 26;
+  const startX = cbX + 10, startY = cbY + 16;
+  const gapX = 4, gapY = 3;
+
+  for (let i = 0; i < STICKY_NOTES.length; i++) {
+    const note = STICKY_NOTES[i];
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const nx = startX + col * (noteW + gapX);
+    const ny = startY + row * (noteH + gapY);
+    const color = STICKY_COLORS[note.status] || '#fbbf24';
+
+    // Note body
+    ctx.fillStyle = color;
+    ctx.fillRect(nx, ny, noteW, noteH);
+
+    // Dark edge
+    ctx.fillStyle = color === '#fbbf24' ? '#d4a017' : color === '#22c55e' ? '#16a34a' : '#dc2626';
+    ctx.fillRect(nx + noteW - 2, ny, 2, noteH);
+    ctx.fillRect(nx, ny + noteH - 2, noteW, 2);
+
+    // Pin dot (red, top center)
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(nx + noteW / 2, ny + 2, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Text (2 lines, truncated)
+    ctx.fillStyle = '#1a1018';
+    ctx.font = '5px monospace';
+    ctx.textAlign = 'left';
+    const lines = note.text.split('\n');
+    if (lines[0]) ctx.fillText(lines[0].substring(0, 8), nx + 2, ny + 12);
+    if (lines[1]) ctx.fillText(lines[1].substring(0, 8), nx + 2, ny + 20);
+  }
+}
+
+// ===== CALENDAR EVENTS =====
+const CALENDAR_EVENTS = [
+  { day: "Mon", label: "Standup", color: "#3b82f6" },
+  { day: "Tue", label: "Standup", color: "#3b82f6" },
+  { day: "Wed", label: "Standup", color: "#3b82f6" },
+  { day: "Wed", label: "Sprint Review", color: "#f59e0b" },
+  { day: "Thu", label: "Standup", color: "#3b82f6" },
+  { day: "Fri", label: "Standup", color: "#3b82f6" },
+  { day: "Fri", label: "Deploy Day", color: "#ef4444" },
+];
+
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// ===== MEETING ROOM WHITEBOARD WITH CALENDAR =====
+function drawMeetingWhiteboard(ctx: CanvasRenderingContext2D, _frame: number) {
+  // Position on rear wall of meeting room
+  const wx = 300, wy = 20, ww = 160, wh = 80;
+
+  // Frame
+  ctx.fillStyle = '#4a4a5a';
+  ctx.fillRect(wx - 4, wy - 4, ww + 8, wh + 8);
+
+  // Whiteboard bg
+  ctx.fillStyle = '#e8e8e8';
+  ctx.fillRect(wx, wy, ww, wh);
+
+  // Label
+  ctx.fillStyle = '#9ca3af';
+  ctx.font = '5px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('WHITEBOARD', wx + 2, wy + 7);
+
+  // Calendar grid
+  const calX = wx + 4, calY = wy + 11;
+  const cellW = 20, cellH = 20;
+
+  // Determine today's day index
+  const todayIdx = (new Date().getDay() + 6) % 7; // Mon=0
+
+  // Day headers
+  ctx.font = '4px monospace';
+  ctx.textAlign = 'center';
+  for (let d = 0; d < 7; d++) {
+    const cx = calX + d * cellW + cellW / 2;
+    ctx.fillStyle = d === todayIdx ? '#ffffff' : '#374151';
+    if (d === todayIdx) {
+      ctx.fillStyle = '#9333ea';
+      ctx.fillRect(calX + d * cellW, calY, cellW, cellH * 3 + 4);
+      ctx.fillStyle = '#ffffff';
+    }
+    ctx.fillText(DAYS[d].substring(0, 2), cx, calY + 5);
+  }
+
+  // Event blocks
+  for (const evt of CALENDAR_EVENTS) {
+    const dayIdx = DAYS.indexOf(evt.day);
+    if (dayIdx === -1) continue;
+    const eventsOnDay = CALENDAR_EVENTS.filter(e => e.day === evt.day);
+    const evtIdx = eventsOnDay.indexOf(evt);
+    const ex = calX + dayIdx * cellW + 1;
+    const ey = calY + 7 + evtIdx * 10;
+    ctx.fillStyle = evt.color;
+    ctx.fillRect(ex, ey, cellW - 2, 8);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '3px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(evt.label.substring(0, 6), ex + (cellW - 2) / 2, ey + 5);
+  }
+
+  // Marker tray
+  ctx.fillStyle = '#d0d0c0';
+  ctx.fillRect(wx - 2, wy + wh + 2, ww + 4, 3);
+  ctx.fillStyle = '#ef4444'; ctx.fillRect(wx + 10, wy + wh + 2, 8, 2);
+  ctx.fillStyle = '#3b82f6'; ctx.fillRect(wx + 22, wy + wh + 2, 8, 2);
+  ctx.fillStyle = '#22c55e'; ctx.fillRect(wx + 34, wy + wh + 2, 8, 2);
+}
+
+// ===== GAME ROOM LEADERBOARD (PODIUM) =====
+const PODIUM = [
+  { rank: 1, agent: "Scotty", emoji: "⚙️", count: 24 },
+  { rank: 2, agent: "Spock", emoji: "🖖", count: 19 },
+  { rank: 3, agent: "Rex", emoji: "🦊", count: 14 },
+];
+
+function drawGameLeaderboard(ctx: CanvasRenderingContext2D, frame: number) {
+  const gx = 240, gy = 520;
+  // Center of game room
+  const cx = gx + 170, baseY = gy + 160;
+
+  // Pixel bar chart behind podium (proportional, 40% opacity)
+  const maxCount = PODIUM[0].count;
+  const barWidth = 28;
+  const barConfigs = [
+    { x: cx - barWidth / 2, color: '#fbbf2466', count: PODIUM[0].count }, // center (1st)
+    { x: cx - barWidth - 10 - barWidth / 2, color: '#94a3b866', count: PODIUM[1].count }, // left (2nd)
+    { x: cx + barWidth + 10 - barWidth / 2, color: '#b4530966', count: PODIUM[2].count }, // right (3rd)
+  ];
+  for (const bar of barConfigs) {
+    const h = (bar.count / maxCount) * 60;
+    ctx.fillStyle = bar.color;
+    ctx.fillRect(bar.x, baseY - h - 8, barWidth, h);
+  }
+
+  // Podium blocks
+  // 2nd place — silver (left)
+  const silverX = cx - 40 - 20;
+  const silverH = 24;
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillRect(silverX, baseY - silverH, 40, silverH);
+  ctx.fillStyle = '#7d8fa8';
+  ctx.fillRect(silverX, baseY - silverH, 40, 3);
+
+  // 1st place — gold (center)
+  const goldX = cx - 24;
+  const goldH = 36;
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillRect(goldX, baseY - goldH, 48, goldH);
+  ctx.fillStyle = '#d4a017';
+  ctx.fillRect(goldX, baseY - goldH, 48, 3);
+
+  // 3rd place — bronze (right)
+  const bronzeX = cx + 24;
+  const bronzeH = 18;
+  ctx.fillStyle = '#b45309';
+  ctx.fillRect(bronzeX, baseY - bronzeH, 40, bronzeH);
+  ctx.fillStyle = '#924208';
+  ctx.fillRect(bronzeX, baseY - bronzeH, 40, 3);
+
+  // Base bar
+  ctx.fillStyle = '#1e1e2e';
+  ctx.fillRect(cx - 70, baseY, 140, 8);
+
+  // Agent sprites + names + counts
+  const podiumData = [
+    { x: goldX + 24, y: baseY - goldH, data: PODIUM[0] },
+    { x: silverX + 20, y: baseY - silverH, data: PODIUM[1] },
+    { x: bronzeX + 20, y: baseY - bronzeH, data: PODIUM[2] },
+  ];
+
+  for (const p of podiumData) {
+    // Mini sprite (12x16)
+    ctx.fillStyle = '#1a1018';
+    ctx.fillRect(p.x - 6, p.y - 18, 12, 16);
+    ctx.fillStyle = p.data.rank === 1 ? '#fbbf24' : p.data.rank === 2 ? '#94a3b8' : '#b45309';
+    ctx.fillRect(p.x - 5, p.y - 17, 10, 14);
+
+    // Head
+    ctx.fillStyle = SKIN_BASE;
+    ctx.fillRect(p.x - 4, p.y - 17, 8, 6);
+
+    // Eyes
+    ctx.fillStyle = '#111';
+    ctx.fillRect(p.x - 2, p.y - 14, 2, 1);
+    ctx.fillRect(p.x + 1, p.y - 14, 2, 1);
+
+    // Emoji above
+    ctx.font = '8px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.data.emoji, p.x, p.y - 22);
+
+    // Name below
+    ctx.fillStyle = '#d0d0d0';
+    ctx.font = 'bold 6px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.data.agent, p.x, baseY + 14);
+
+    // Count
+    ctx.fillStyle = '#9333ea';
+    ctx.font = 'bold 7px monospace';
+    ctx.fillText(String(p.data.count), p.x, baseY + 22);
+  }
+
+  // Animated sparkle on 1st place
+  const sparkle = Math.sin(frame * 0.08) > 0.7;
+  if (sparkle) {
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(goldX + 10, baseY - goldH - 24, 2, 2);
+    ctx.fillRect(goldX + 30, baseY - goldH - 20, 2, 2);
+  }
 }

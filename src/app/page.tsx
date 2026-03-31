@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import ActivityPanel from '@/components/ActivityPanel';
 import { AgentState, ActivityItem, SystemStats, AGENTS } from '@/lib/agents';
 import { generateChatMessage } from '@/lib/agent-chat';
+import TickerStrip from '@/components/TickerStrip';
 
 const PixelOffice = dynamic(() => import('@/components/PixelOffice'), { ssr: false });
 
@@ -145,9 +146,12 @@ export default function Home() {
 
   return (
     <main className="h-screen w-screen bg-[#0a0a0f] flex flex-col md:flex-row overflow-hidden relative">
-      {/* Top (mobile) / Left (desktop): Pixel Office */}
-      <div className="w-full md:flex-[7] h-[55vh] md:h-full p-1 md:p-2 flex items-center justify-center min-w-0 shrink-0">
-        <PixelOffice agents={agents} activities={activities} onAgentClick={handleAgentClick} />
+      {/* Top (mobile) / Left (desktop): Pixel Office with Ticker */}
+      <div className="w-full md:flex-[7] h-[55vh] md:h-full flex flex-col min-w-0 shrink-0">
+        <TickerStrip />
+        <div className="flex-1 p-1 md:p-2 flex items-center justify-center min-w-0">
+          <PixelOffice agents={agents} activities={activities} onAgentClick={handleAgentClick} />
+        </div>
       </div>
 
       {/* Bottom (mobile) / Right (desktop): Activity Panel */}
